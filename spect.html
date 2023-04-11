@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Three.js Orb Animation</title>
+  <style>
+    body {
+      margin: 0;
+      overflow: hidden;
+    }
+  </style>
+</head>
+<body>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script>
+    function visualizeAudio() {
+  // create an AudioContext object
+  const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  
+  // create a AnalyserNode object to get frequency data
+  const analyser = audioCtx.createAnalyser();
+  analyser.fftSize = 256;
+  
+  // create a canvas element to display the spectrogram
+  const canvas = document.createElement('canvas');
+  const ctx = canvas.getContext('2d');
+  canvas.width = window.innerWidth;
+  canvas.height = 300;
+  document.body.appendChild(canvas);
+  
+  // get the audio input from the user's microphone
+  navigator.mediaDevices.getUserMedia({ audio: true })
+    .then((stream) => {
+      // create a MediaStreamAudioSourceNode object to get audio input from the microphone
+      const source = audioCtx.createMediaStreamSource(stream);
+      
+      // connect the source to the analyser and the analyser to the destination (speakers)
+      source.connect(analyser);
+      analyser.connect(audioCtx.destination);
+      
+      // create a Uint8Array to hold the frequency data
+      const dataArray = new Uint8Array(analyser.frequencyBinCount);
+      
+      // render the spectrogram every frame using requestAnimationFrame
+      function render() {
+        // copy the frequency data from the analyser into the dataArray
+        analyser.getByteFrequencyData(dataArray);
+        
+        // clear the canvas
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        
+        // loop over each frequency bin and draw a rectangle on the canvas
+        const binWidth = canvas.width / dataArray.length;
+        for (let i = 0; i < dataArray.length; i++) {
+          const value = dataArray[i];
+          const height = canvas.height * (value / 255);
+          const x = i * binWidth;
+          const y = canvas.height - height;
+          
+          ctx.fillStyle = `rgb(${value}, ${value}, ${value})`;
+          ctx.fillRect(x, y, binWidth, height);
+        }
+        
+        // request the next frame
+        requestAnimationFrame(render);
+      }
+      
+      // start rendering
+      render();
+    })
+    .catch((error) => {
+      console.error(error);
+    });
+}
+</script>
+<button onclick="visualizeAudio()">Start</button>
+</body>
+</html>

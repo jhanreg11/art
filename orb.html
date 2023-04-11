@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Three.js Orb Animation</title>
+  <style>
+    body {
+      margin: 0;
+      overflow: hidden;
+    }
+  </style>
+</head>
+<body>
+    <script async src="https://unpkg.com/es-module-shims@1.6.3/dist/es-module-shims.js"></script>
+
+<script type="importmap">
+  {
+    "imports": {
+      "three": "https://unpkg.com/three@0.151.3/build/three.module.js",
+      "three/addons/": "https://unpkg.com/three@0.151.3/examples/jsm/"
+    }
+  }
+</script>
+      <script type="module">
+        import * as THREE from "three";
+        import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+        import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+        import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
+const rgbShiftShader = {
+    uniforms: {
+        'tDiffuse': { value: null },
+        'amount': { value: 0.005 },
+        'angle': { value: 0.0 }
+    },
+    vertexShader: `
+        varying vec2 vUv;
+
+        void main() {
+            vUv = uv;
+            gl_Position = projectionMatrix * modelViewMatrix * vec4( position, 1.0 );
+        }
+    `,
+    fragmentShader: `
+        uniform  sampler2D tDiffuse;
+        uniform float amount;
+        uniform float angle;
+
+        varying vec2 vUv;
+
+        void main() {
+            vec2 offset = amount * vec2(cos(angle), sin(angle)) + vec2(amount * sin(amount), amount * cos(amount));
+            vec4 cr = texture2D(tDiffuse, vUv + offset);
+			vec4 cga = texture2D(tDiffuse, vUv);
+			vec4 cb = texture2D(tDiffuse, vUv - offset);
+			gl_FragColor = vec4(cr.r, cga.g, cb.b, cga.a);
+        }
+    `
+}
+
+const randomCoord = (origin, z_change, x_amp, y_amp) => [
+    origin[0] + Math.floor(Math.random() * x_amp - x_amp / 2), 
+    origin[1] + Math.floor(Math.random() * y_amp - x_amp / 2),
+    origin[2] + z_change
+];
+
+function lerp(p1, p2, t) {
+  const x = p1[0] + (p2[0] - p1[0]) * t;
+  const y = p1[1] + (p2[1] - p1[1]) * t;
+  const z = p1[2] + (p2[2] - p1[2]) * t;
+
+  return [x, y, z];
+}
+
+const generateLineCoords = (start_coord, n_segments=10, z_change=10, x_amp=10, y_amp=10, interp=lerp) => {
+    const coord_list = [...start_coord];
+    let prev = start_coord;
+    let next = randomCoord(start_coord, z_change, x_amp, y_amp);
+    for (let i = start_coord[2]; i < n_segments * z_change + start_coord[2]; i++) {
+        if ((i - start_coord[2]) % z_change === 0) {
+            prev = next;
+            next = randomCoord(start_coord, z_change, x_amp, y_amp); 
+            coord_list.push(...prev);
+        }
+        else {
+            coord_list.push(...interp(prev, next, (i - prev[2]) / z_change));
+        }
+    }
+    return coord_list;
+};
+
+const frames = 100;
+const freqs = 128;
+
+const renderer = new THREE.WebGLRenderer();
+
+renderer.setSize(window.innerWidth, window.innerHeight);
+document.body.appendChild(renderer.domElement);
+
+const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+camera.position.set(50, -100, 100);
+camera.lookAt(0, 0, 0);
+
+const scene = new THREE.Scene();
+
+const lines = [];
+for (let i = 0; i < Math.floor(Math.sqrt(freqs)); i++) {
+    for (let j = 0; j < Math.floor(Math.sqrt(freqs)); ++j) {
+        const geometry = new THREE.BufferGeometry();
+        const positions = generateLineCoords([i * 2, j * 2, 0])
+        console.log(positions);
+        //   const positions = [];
+        //   for (let j = 0; j < frames; j++) {
+        //     positions.push(j - frames / 2, i*2, 0);
+        //   }
+        geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array(positions), 3));
+        const material = new THREE.LineBasicMaterial({ color: 0xffffff });
+        const line = new THREE.Line(geometry, material);
+
+        scene.add(line);
+        lines.push(line);
+    }
+}
+
+function shiftLinePoints(line, z) {
+  const positions = line.geometry.attributes.position.array;
+  const numPoints = positions.length / 3;
+
+  positions[(numPoints - 1) * 3 + 2] = z;
+
+  for (let i = 0; i < numPoints - 1; i++) {
+    positions[i * 3 + 2] = positions[(i + 1) * 3 + 2];
+  }
+
+  line.geometry.attributes.position.needsUpdate = true;
+}
+
+function adjustFreqs(freqData) {
+    const newData = [];
+    const mid = Math.floor(freqData.length / 2);
+    const low = Math.floor(freqData.length / 4);
+    const high = low * 3;
+    for (let i = 0; i < freqData.length; ++i) {
+        let val = 0;
+        if (i < mid && i >= low) {
+            val += freqData[high - i];
+        }
+        else if (i >= mid && i < high) {
+            val += freqData[i - high];
+        }
+        newData.push(Math.pow(val, 1.2));
+    }
+    return newData;
+}
+
+function arrayRotate(arr, count) {
+  const len = arr.length
+  arr.push(...arr.splice(0, (-count % len + len) % len))
+  return arr
+}
+
+function getStandardDeviation (array) {
+  const n = array.length
+  const mean = array.reduce((a, b) => a + b) / n
+  return Math.sqrt(array.map(x => Math.pow(x - mean, 2)).reduce((a, b) => a + b) / n)
+}
+
+const composer = new EffectComposer( renderer );
+composer.addPass(new RenderPass(scene, camera));
+const rgbShift = new ShaderPass(rgbShiftShader);
+composer.addPass(rgbShift);
+
+function  animation() {
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    const analyser = audioCtx.createAnalyser();
+    analyser.fftSize = freqs;
+
+    navigator.mediaDevices.getUserMedia({ audio: true })
+        .then((stream) => {
+        const source = audioCtx.createMediaStreamSource(stream);
+        source.connect(analyser);
+        analyser.connect(audioCtx.destination);
+      
+        const dataArray = new Uint8Array(analyser.frequencyBinCount);
+        let rotated;
+        function render() {
+            // analyser.getByteFrequencyData(dataArray);
+            // // rotated = adjustFreqs(dataArray)
+            // for (let i = 0; i < lines.length; ++i) {
+            //     shiftLinePoints(lines[i], Math.log2(dataArray[i] + 1));
+            // }
+
+            requestAnimationFrame(render);
+
+            rgbShift.uniforms.amount.value = Math.max(...dataArray) / 10000;
+            console.log(Math.max(...dataArray))
+            composer.render();
+        }
+        render();
+    });
+}
+
+document.addEventListener("DOMContentLoaded", function(event) { 
+    document.getElementById('start').addEventListener('mouseup', () => animation());
+});
+  </script>
+  <button id="start" style="position: absolute; top: 0; left: 0;">start</button>
+</body>
+</html>

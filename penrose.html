@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Three.js Orb Animation</title>
+  <style>
+    body {
+      margin: 0;
+      overflow: hidden;
+    }
+  </style>
+</head>
+<body>
+    <script async src="https://unpkg.com/es-module-shims@1.6.3/dist/es-module-shims.js"></script>
+
+<script type="importmap">
+  {
+    "imports": {
+      "three": "https://unpkg.com/three@0.151.3/build/three.module.js",
+      "three/addons/": "https://unpkg.com/three@0.151.3/examples/jsm/"
+    }
+  }
+</script>
+      <script type="module">
+import * as THREE from "three";
+
+const getStepsBbox = (p1, p2, h) => {
+    const hVec = new THREE.Vector3(0, 0, h)
+    const allPoints = [p1, p2, p1.clone().add(hVec), p2.clone().sub(hVec)];
+    const [maxPoint, minPoint] = p1.x > p2.x ? [p1, p2]: [p2, p1];  
+    const d = maxPoint.x - minPoint.x;
+    const dVec = new THREE.Vector3(d, 0, 0);
+    allPoints.push(minPoint.clone().add(dVec), maxPoint.clone().sub(dVec));
+
+    allPoints.push(allPoints[4].clone().add(hVec), allPoints[5].clone().sub(hVec));
+    return allPoints;
+};
+
+function createAngledBox(vertices) {
+  const geometry = new THREE.BufferGeometry();
+  const position = new Float32Array([
+    vertices[0].x, vertices[0].y, vertices[0].z,
+    vertices[1].x, vertices[1].y, vertices[1].z,
+    vertices[2].x, vertices[2].y, vertices[2].z,
+
+    vertices[0].x, vertices[0].y, vertices[0].z,
+    vertices[2].x, vertices[2].y, vertices[2].z,
+    vertices[3].x, vertices[3].y, vertices[3].z,
+
+    vertices[0].x, vertices[0].y, vertices[0].z,
+    vertices[3].x, vertices[3].y, vertices[3].z,
+    vertices[4].x, vertices[4].y, vertices[4].z,
+
+    vertices[0].x, vertices[0].y, vertices[0].z,
+    vertices[4].x, vertices[4].y, vertices[4].z,
+    vertices[5].x, vertices[5].y, vertices[5].z,
+
+    vertices[0].x, vertices[0].y, vertices[0].z,
+    vertices[5].x, vertices[5].y, vertices[5].z,
+    vertices[1].x, vertices[1].y, vertices[1].z,
+
+    vertices[1].x, vertices[1].y, vertices[1].z,
+    vertices[5].x, vertices[5].y, vertices[5].z,
+    vertices[6].x, vertices[6].y, vertices[6].z,
+
+    vertices[1].x, vertices[1].y, vertices[1].z,
+    vertices[6].x, vertices[6].y, vertices[6].z,
+    vertices[2].x, vertices[2].y, vertices[2].z,
+
+    vertices[2].x, vertices[2].y, vertices[2].z,
+    vertices[6].x, vertices[6].y, vertices[6].z,
+    vertices[7].x, vertices[7].y, vertices[7].z,
+
+    vertices[2].x, vertices[2].y, vertices[2].z,
+    vertices[7].x, vertices[7].y, vertices[7].z,
+    vertices[3].x, vertices[3].y, vertices[3].z,
+
+    vertices[3].x, vertices[3].y, vertices[3].z,
+    vertices[7].x, vertices[7].y, vertices[7].z,
+    vertices[4].x, vertices[4].y, vertices[4].z,
+
+    vertices[4].x, vertices[4].y, vertices[4].z,
+    vertices[7].x, vertices[7].y, vertices[7].z,
+    vertices[5].x, vertices[5].y, vertices[5].z,
+  ]);
+
+  const material = new THREE.MeshBasicMaterial({ color: 0xffffff, wireframe: true });
+  const mesh = new THREE.Mesh(geometry, material);
+
+  return mesh;
+};
+
+function createBox(vertices, i) {
+  // Compute the bounding box of the vertices
+  const box = new THREE.Box3().setFromPoints(vertices);
+  const center = box.getCenter(new THREE.Vector3());
+
+  // Compute the dimensions of the box
+  const size = box.getSize(new THREE.Vector3());
+  const width = size.x;
+  const height = size.y;
+  const depth = size.z;
+
+  // Compute the rotation of the box
+  const rotationMatrix = new THREE.Matrix4().lookAt(
+    vertices[0],
+    vertices[1],
+    new THREE.Vector3(0, 1, 0)
+  );
+  const rotation = new THREE.Euler().setFromRotationMatrix(rotationMatrix);
+
+  // Create the box geometry
+  const geometry = new THREE.BoxGeometry(width, height, depth);
+
+  // Move the box geometry to the center of the bounding box
+  geometry.translate(center.x, center.y, center.z);
+
+  // Rotate the box geometry
+  geometry.rotateX(rotation.x);
+  geometry.rotateY(rotation.y);
+  geometry.rotateZ(rotation.z);
+
+  const colors = [0xff0000, 0x00ff00, 0x0000ff, 0xf0f000]
+
+  // Create the box mesh
+  const material = new THREE.MeshBasicMaterial({ color:  colors[i]});
+  const mesh = new THREE.Mesh(geometry, material);
+
+  return mesh;
+};
+
+const createStairCase = (p1, p2, n, axis) => {
+    const offAxis = axis === 'x' ? 'y' : 'x';
+
+    const stepLen = (p1[axis] - p2[axis]) / n;
+    const stepHeight = (p1.z - p2.z) / n;
+    const stepWidth = (p1[offAxis] - p2[offAxis]);
+
+    for (let i = 0; i < n; ++i) {
+        const p11 = p1
+    }
+}
+const renderer = new THREE.WebGLRenderer();
+
+renderer.setSize(window.innerWidth, window.innerHeight);
+document.body.appendChild(renderer.domElement);
+
+const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+camera.position.set(20, 20, 20);
+camera.lookAt(0, 0, 0);
+
+const scene = new THREE.Scene();
+
+const size = 10;
+const ws = [2, 2, 2, 2]; // offsets from base
+const h = 2;
+
+const starts = [new THREE.Vector3(0, ws[0]/1.0, 0), new THREE.Vector3(ws[1]/1.0, size/1.0, 0), new THREE.Vector3(size/1.0, size - ws[2]/1.0, 0), new THREE.Vector3(size - ws[3]/1.0, 0, 0)];
+
+const vertLists = [];
+for (let i = 0; i < 4; ++i) {
+    const majorAxis = i % 2 === 0 ? 'y' : 'x';
+    const verts = getStepsBbox(starts[i], starts[(i + 1) % 4], h);
+    console.log(verts, i)
+    // const geometry = new THREE.BufferGeometry().setFromPoints(verts);
+    // geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array(verts), 3));
+
+    // const material = new THREE.MeshBasicMaterial({color: 0xff0000});
+    // const mesh = new THREE.Mesh(geometry, material);
+    const box = createBox(verts, i);
+    scene.add(box);
+}
+
+const axes = new THREE.AxesHelper(50);
+scene.add(axes);
+
+let time = 0;
+const animation = () => {
+  renderer.render(scene, camera);
+  time++;
+  requestAnimationFrame(animation)
+}
+animation();
+  </script>
+</body>
+</html>
